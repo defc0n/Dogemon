@@ -1,21 +1,29 @@
-#!perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
 
-use Dogemon::Daemon;
+use Dogemon;
 use Getopt::Long;
 
+my $foreground;
+my $num_workers;
 my $pid_file;
 my $help;
 
-GetOptions( 'p|pid' => \$pid_file,
+GetOptions( 'f|foreground' => \$foreground,
+	    'w|num-workers' => \$num_workers,
+	    'p|pid' => \$pid_file,
 	    'h|?|help' => \$help );
 
 if ( $help ) {
 
-    print "$0 [--pid <pid-file>] [--help]\n";
+    print "$0 [--foreground] [--num-workers <num>] [--pid <pid-file>] [--help]\n";
     exit 1;
 }
 
-Dogemon::Daemon->new( pid_file => $pid_file )->daemonize;
+my $dogemon = Dogemon->new( daemonize => !$foreground,
+			    num_workers => $num_workers,
+			    pid_file => $pid_file );
+
+$dogemon->run();

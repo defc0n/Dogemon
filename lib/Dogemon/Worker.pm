@@ -3,6 +3,8 @@ package Dogemon::Worker;
 use Moo;
 use namespace::clean;
 
+use Dogemon::Scheduler;
+
 has id => ( is => 'ro' );
 
 sub work {
