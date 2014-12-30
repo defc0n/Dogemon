@@ -1,0 +1,21 @@
+#!perl
+
+use strict;
+use warnings;
+
+use Dogemon::Daemon;
+use Getopt::Long;
+
+my $pid_file;
+my $help;
+
+GetOptions( 'p|pid' => \$pid_file,
+	    'h|?|help' => \$help );
+
+if ( $help ) {
+
+    print "$0 [--pid <pid-file>] [--help]\n";
+    exit 1;
+}
+
+Dogemon::Daemon->new( pid_file => $pid_file )->daemonize;
