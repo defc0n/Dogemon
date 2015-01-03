@@ -1,12 +1,12 @@
 package Dogemon;
 
 use Moo;
-use namespace::clean;
 
-use Dogemon::Daemon;
 use Dogemon::Worker;
 
+use Proc::Daemon;
 use Sys::Info::Device::CPU;
+
 use Data::Dumper;
 
 ### object attributes ###
@@ -25,13 +25,14 @@ sub run {
     # check if we need to daemonize
     if ( $self->daemonize ) {
 
-	my $daemon = Dogemon::Daemon->new( pid_file => $self->pid_file );
+	my $pid = $self->_daemonize;
 
-	my $pid = $daemon->daemonize;
-
-	# just return if we're the original parent (not child)
+	# just return if we're the original parent (not the child daemon)
 	return $pid if $pid;
     }
+
+    # fix our process name
+    $0 = 'dogemon [main]';
 
     # check if we need to determine number of workers to use
     $self->_determine_num_workers if !$self->num_workers;
@@ -60,6 +61,16 @@ sub run {
 }
 
 ### private methods ###
+
+sub _daemonize {
+
+    my ( $self ) = @_;
+
+    my $daemon = Proc::Daemon->new( pid_file => $self->pid_file );
+    my $pid = $daemon->Init();
+
+    return $pid;
+}
 
 sub _determine_num_workers {
 
