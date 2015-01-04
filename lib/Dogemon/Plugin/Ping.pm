@@ -2,10 +2,7 @@ package Dogemon::Plugin::Ping;
 
 use Moo;
 
-with 'Dogemon::Role::Plugin';
-
 use Dogemon::Constants;
-use Dogemon::Alert;
 
 use AnyEvent;
 use AnyEvent::Ping;
@@ -13,40 +10,99 @@ use AnyEvent::Ping;
 use Math::Round::Var;
 use Data::Dumper;
 
+with 'Dogemon::Role::Plugin';
+
+has num_packets => ( is => 'ro',
+		     required => 0,
+		     default => 5 );
+
+has packet_delay => ( is => 'ro',
+		      required => 0,
+		      default => 1 );
+
+has loss_threshold => ( is => 'ro',
+			required => 0,
+			default => 1 );
+
+has latency_threshold => ( is => 'ro',
+			   required => 0,
+			   default => 300 );
+
 sub run {
 
     my ( $self ) = @_;
 
     my $cv = AnyEvent->condvar;
 
-    my $status;
-    my $rtt;
+    my $num_packets = $self->num_packets;
+
+    my $min;
+    my $max;
+    my $avg;
+    my $total_latency = 0;
     
-    my $pinger = AnyEvent::Ping->new;
+    my $num_lost = 0;
+    my $num_found = 0;
 
-    $pinger->ping( $self->host, 1, sub {
+    my $pinger = AnyEvent::Ping->new( timeout => $self->timeout,
+				      interval => $self->packet_delay );
 
-	my ( $result ) = @_;
+    $pinger->ping( $self->host, $num_packets, sub {
 
-	( $status, $rtt ) = @{$result->[0]};
+	my ( $results ) = @_;
+
+	foreach my $result ( @$results ) {
+
+	    warn Dumper $result;
+
+	    my ( $status, $rtt ) = @$result;
+
+	    # convert seconds to ms
+	    $rtt *= 1000;
+
+	    # lost packet
+	    if ( $status ne 'OK' ) {
+
+		$num_lost++;
+		next;
+	    }
+
+	    $num_found++;
+	    $total_latency += $rtt;
+
+	    $min = $rtt if ( !defined $min || $rtt < $min );
+	    $max = $rtt if ( !defined $max || $rtt > $max );
+	}
 
 	$cv->send;
-
-		   } );
+    } );
 
     $cv->recv;
     $pinger->end;
 
-    # convert seconds to ms
-    $rtt *= 1000;
+    my $status = UP;
 
-    my $rounder = Math::Round::Var->new( 0.1 );
+    $min = 'N/A' if ( !defined $min );
+    $max = 'N/A' if ( !defined $max );
+    
+    if ( $num_found ) {
+	
+	$avg = $total_latency / $num_found;
+	
+	$status = DEGRADED if ( $avg > $self->latency_threshold );
 
-    $rtt = $rounder->round( $rtt );
+	my $rounder = Math::Round::Var->new( 0.1 );
+	
+	$avg = $rounder->round( $avg ) . " ms";
+    }
 
-    return Dogemon::Alert->new( host => $self->host,
-				description => "$status: $rtt ms",
-				status => ( $status eq "OK" ) ? UP : DOWN );
+    $avg = 'N/A' if ( !defined $avg );
+
+    $status = DOWN if ( $num_lost > $self->loss_threshold );    
+
+    return {'host' => $self->host,
+	    'description' => "Received $num_found/$num_packets packets, avg. latency $avg",
+	    'status' => $status};
 }
 
 1;
