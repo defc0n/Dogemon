@@ -8,8 +8,8 @@ use Dogemon::Scheduler;
 use AnyEvent;
 use Data::Dumper;
 
-has id => ( is => 'ro' );
-has db => ( is => 'rw' );
+has id => ( is => 'ro',
+	    required => 1 );
 
 sub work {
 
@@ -26,7 +26,9 @@ sub work {
 
     # establish our own database connection
     my $db = Dogemon::Database->new( filename => '/tmp/dogemon.db' );
-    $self->db( $db );
+
+    # determine the services we are responsible for
+    my $services = $db->get_worker_services( id => $self->id );
     
     # do work, doge
     while ( 1 ) {

@@ -40,11 +40,11 @@ sub run {
     # create all of our worker doges
     my @worker_pids;
 
-    for ( my $n = 0; $n < $self->num_workers; $n++ ) {
+    for my $worker_id ( 1 .. $self->num_workers ) {
 
 	warn "creating worker $n";
 
-	my $worker_pid = Dogemon::Worker->new( id => $n )->work;
+	my $worker_pid = Dogemon::Worker->new( id => $worker_id )->work;
 
 	push @worker_pids, $worker_pid;
     }

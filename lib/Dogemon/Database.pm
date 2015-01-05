@@ -2,7 +2,6 @@ package Dogemon::Database;
 
 use Moo;
 
-use AnyEvent;
 use AnyEvent::DBI::Abstract;
 
 use Data::Dumper;
@@ -21,14 +20,9 @@ sub BUILD {
     my ( $self ) = @_;
 
     my $filename = $self->filename;
-    my $cv = AnyEvent->condvar;
 
-    my $dbh = AnyEvent::DBI::Abstract->new( "DBI:SQLite:dbname=$filename", "", "",
-					    on_connect => sub { $cv->send },
-					    on_error => sub { warn @$ } );
+    my $dbh = AnyEvent::DBI::Abstract->new( "DBI:SQLite:dbname=$filename", "", "" );
     
-    $cv->recv;
-
     $self->dbh( $dbh );
 }
 
@@ -38,6 +32,8 @@ sub get_nodes {
 
     my ( $self, %args ) = @_;
 
+    my $callback = $args{'callback'};
+
     my $table = 'node';
     my $fields = ['node.node_id',
 		  'node.name',
@@ -46,8 +42,6 @@ sub get_nodes {
     my $order = ['node.node_id'];
 
     my $results = [];
-
-    my $cv = AnyEvent->condvar;
 
     $self->dbh->select( $table,
 			$fields,
@@ -64,17 +58,15 @@ sub get_nodes {
                                                 'ip_address' => $row->[2]};
                             }
 
-                            $cv->send;
+			    $callback->( $results );
 			} );
-
-    $cv->recv;
-
-    return $results;
 }
 
 sub get_services {
 
     my ( $self, %args ) = @_;
+
+    my $callback = $args{'callback'};
 
     my $table = 'service',
     my $fields = ['service.service_id',
@@ -87,8 +79,6 @@ sub get_services {
     my $order = ['service.service_id'];
 
     my $results = [];
-
-    my $cv = AnyEvent->condvar;
 
     $self->dbh->select( $table,
 			$fields,
@@ -108,12 +98,8 @@ sub get_services {
 						'timeout' => $row->[5]};
 			    }
 			    
-			    $cv->send;
-			} );
-    
-    $cv->recv;
-
-    return $results;
+			    $callback->( $results );
+			} );   
 }
 
 1;
